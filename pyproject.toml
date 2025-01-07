@@ -1,0 +1,14 @@
+[project]
+name = "inhand"
+version = "0.0.1"
+
+dependencies=[
+    "nerfstudio"
+]
+
+[tool.setuptools.packages.find]
+include = ["inhand*"]
+
+[project.entry-points.'nerfstudio.method_configs']
+ihgs = 'inhand.ih_config:ihgs_method'
+ihrf = 'inhand.ih_config:ihrf_method'
