@@ -22,6 +22,8 @@ from nerfstudio.model_components.lib_bilagrid import (
     slice,
     total_variation_loss,
 )
+from nerfstudio.models.instant_ngp import InstantNGPModelConfig, NGPModel
+from nerfstudio.cameras.camera_optimizers import CameraOptimizer, CameraOptimizerConfig
 
 import math
 from dataclasses import dataclass, field
@@ -87,6 +89,7 @@ class IHGSModel(SplatfactoModel):
         mask = self._downscale_if_required(batch["mask"])
         mask = mask.to(self.device)
         assert mask.shape[:2] == gt_img.shape[:2] == pred_img.shape[:2]
+        mask = mask.float()
         mask = mask.float()
         gt_img = gt_img * mask
         pred_img = pred_img * mask
