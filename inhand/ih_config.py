@@ -44,18 +44,19 @@ ihgs_method = MethodSpecification(
         steps_per_eval_all_images=1000,
         max_num_iterations=30000,
         mixed_precision=False,
-        pipeline=VanillaPipelineConfig(
+        pipeline=IHGSPipelineConfig(
             datamanager=FullImageDatamanagerConfig(
-                dataparser=NerfstudioDataParserConfig(load_3D_points=True),
+                dataparser=NerfstudioDataParserConfig(
+                    load_3D_points=True, orientation_method="none", center_method="none", auto_scale_poses=False),
                 cache_images_type="uint8",
             ),
             model=IHGSModelConfig(),
         ),
         optimizers={
             "means": {
-                "optimizer": AdamOptimizerConfig(lr=1.6e-4, eps=1e-15),
+                "optimizer": AdamOptimizerConfig(lr=1e-4, eps=1e-15),
                 "scheduler": ExponentialDecaySchedulerConfig(
-                    lr_final=1.6e-6,
+                    lr_final=8e-7,
                     max_steps=30000,
                 ),
             },
@@ -72,21 +73,24 @@ ihgs_method = MethodSpecification(
                 "scheduler": None,
             },
             "scales": {
-                "optimizer": AdamOptimizerConfig(lr=0.005, eps=1e-15),
-                "scheduler": None,
+                "optimizer": AdamOptimizerConfig(lr=0.004, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(
+                    lr_final=0.001,
+                    max_steps=30000,
+                ),
             },
             "quats": {
                 "optimizer": AdamOptimizerConfig(lr=0.001, eps=1e-15),
                 "scheduler": None,
             },
             "camera_opt": {
-                "optimizer": AdamOptimizerConfig(lr=1e-4, eps=1e-15),
+                "optimizer": AdamOptimizerConfig(lr=5e-5, eps=1e-15),
                 "scheduler": ExponentialDecaySchedulerConfig(
-                    lr_final=5e-7, max_steps=30000, warmup_steps=1000, lr_pre_warmup=0
+                    lr_final=1e-6, max_steps=30000, warmup_steps=3000, lr_pre_warmup=0
                 ),
             },
             "bilateral_grid": {
-                "optimizer": AdamOptimizerConfig(lr=2e-3, eps=1e-15),
+                "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
                 "scheduler": ExponentialDecaySchedulerConfig(
                     lr_final=1e-4, max_steps=30000, warmup_steps=1000, lr_pre_warmup=0
                 ),

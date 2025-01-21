@@ -42,17 +42,30 @@ import torchvision
 from pytorch_msssim import SSIM
 from torch.nn import Parameter
 
+#add model configs
+# @dataclass
+# class SplatfactoModelConfig(ModelConfig):
+
 
 @dataclass
 class IHGSModelConfig(SplatfactoModelConfig):
     _target: Type = field(default_factory=lambda: IHGSModel)
-    num_random: int = 100
-    random_scale: float = 0.5
+    cull_alpha_thresh: float = 0.005
+    densify_grad_thresh: float = 0.0006
+    densify_size_thresh: float = 0.001
+    random_init: bool = True
+    num_random: int = 10000
+    random_scale: float = .3
+    stop_split_at: int = 25000
+    use_scale_regularization: bool = True
+    rasterize_mode: Literal["classic", "antialiased"] = "antialiased"
+    camera_optimizer: CameraOptimizerConfig = field(default_factory=lambda: CameraOptimizerConfig(mode="SO3xR3"))
+    strategy: Literal["default", "mcmc"] = "mcmc"
+    max_gs_num: int = 100_000
 
 
 class IHGSModel(SplatfactoModel):
     config: IHGSModelConfig
-
     def get_loss_dict(
         self, outputs, batch, metrics_dict=None
     ) -> Dict[str, torch.Tensor]:
@@ -74,6 +87,7 @@ class IHGSModel(SplatfactoModel):
         mask = self._downscale_if_required(batch["mask"])
         mask = mask.to(self.device)
         assert mask.shape[:2] == gt_img.shape[:2] == pred_img.shape[:2]
+        mask = mask.float()
         gt_img = gt_img * mask
         pred_img = pred_img * mask
 
@@ -93,8 +107,9 @@ class IHGSModel(SplatfactoModel):
             scale_reg = 0.1 * scale_reg.mean()
         else:
             scale_reg = torch.tensor(0.0).to(self.device)
-
-        alpha_loss = torch.mean(outputs["accumulation"] * (1 - mask.detach())) * 0.01
+        # alpha_loss = torch.mean(outputs["accumulation"] * (1 - mask.float().detach())) * 0.01
+        alpha_loss = torch.nn.L1Loss()(outputs["accumulation"], mask)
+        # alpha_loss = torch.mean(outputs["accumulation"] * (1 - mask.detach())) * 0.01
         loss_dict = {
             "main_loss": (1 - self.config.ssim_lambda) * Ll1
             + self.config.ssim_lambda * simloss,
