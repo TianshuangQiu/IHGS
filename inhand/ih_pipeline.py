@@ -14,6 +14,9 @@ from nerfstudio.pipelines.base_pipeline import (
 )
 from inhand.ihgs import IHGSModelConfig, IHGSModel
 from inhand.ih_datamanager import IHDataManagerConfig, IHDataManager
+from nerfstudio.utils import profiler
+from nerfstudio.utils.spherical_harmonics import RGB2SH, SH2RGB, num_sh_bases
+
 
 
 @dataclass
@@ -42,3 +45,35 @@ class IHGSPipeline(VanillaPipeline):
         grad_scaler: typing.Optional[GradScaler] = None,
     ):
         super().__init__(config, device, test_mode, world_size, local_rank, grad_scaler)
+    
+    @profiler.time_function
+    def get_train_loss_dict(self, step: int):
+        model_outputs, loss_dict, metrics_dict = super().get_train_loss_dict(step)
+        self.save_gaussians(step)
+        return model_outputs, loss_dict, metrics_dict
+    
+    def save_gaussians(self, step):
+        import open3d as o3d
+        import numpy as np
+
+        if step % 5000 == 0 and step != 0 or step == 29999:
+            model = self.model
+            data_path = self.config.datamanager.dataparser.data
+            # breakpoint()
+            # Extract Gaussian parameters
+            positions = model.gauss_params["means"].detach().cpu().numpy()  # Gaussian centers
+            scales = model.gauss_params["scales"].detach().cpu().numpy()    # Gaussian scales
+            opacities = model.gauss_params["opacities"].detach().cpu().numpy()  # Gaussian opacities
+            colors = SH2RGB(model.gauss_params["features_dc"]).detach().cpu().numpy()
+            #SH2RGB(self.features_dc)
+            
+            # Create a point cloud object
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(positions)  # Set positions
+            pcd.colors = o3d.utility.Vector3dVector(colors)  # Set colors
+
+            # Save the point cloud as a .ply file
+            output_path = f"{data_path}/gaussians_step_{step}.ply"
+            o3d.io.write_point_cloud(output_path, pcd)
+            print(f"Saved point cloud to {output_path}")
+

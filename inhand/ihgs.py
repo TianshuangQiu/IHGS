@@ -44,96 +44,30 @@ import torchvision
 from pytorch_msssim import SSIM
 from torch.nn import Parameter
 
+#add model configs
+# @dataclass
+# class SplatfactoModelConfig(ModelConfig):
+
 
 @dataclass
 class IHGSModelConfig(SplatfactoModelConfig):
     _target: Type = field(default_factory=lambda: IHGSModel)
-    warmup_length: int = 400
-    """period of steps where refinement is turned off"""
-    refine_every: int = 100
-    """period of steps where gaussians are culled and densified"""
-    resolution_schedule: int = 3000
-    """training starts at 1/d resolution, every n steps this is doubled"""
-    background_color: Literal["random", "black", "white"] = "random"
-    """Whether to randomize the background color."""
-    num_downscales: int = 2
-    """at the beginning, resolution is 1/2^d, where d is this number"""
     cull_alpha_thresh: float = 0.005
-    """threshold of opacity for culling gaussians. One can set it to a lower value (e.g. 0.005) for higher quality."""
-    cull_scale_thresh: float = 0.5
-    """threshold of scale for culling huge gaussians"""
-    reset_alpha_every: int = 30
-    """Every this many refinement steps, reset the alpha"""
     densify_grad_thresh: float = 0.0006
-    """threshold of positional gradient norm for densifying gaussians"""
-    use_absgrad: bool = True
-    """Whether to use absgrad to densify gaussians, if False, will use grad rather than absgrad"""
     densify_size_thresh: float = 0.001
-    """below this size, gaussians are *duplicated*, otherwise split"""
-    n_split_samples: int = 2
-    """number of samples to split gaussians into"""
-    sh_degree_interval: int = 1000
-    """every n intervals turn on another sh degree"""
-    cull_screen_size: float = 0.15
-    """if a gaussian is more than this percent of screen space, cull it"""
-    split_screen_size: float = 0.05
-    """if a gaussian is more than this percent of screen space, split it"""
-    stop_screen_size_at: int = 4000
-    """stop culling/splitting at this step WRT screen size of gaussians"""
     random_init: bool = True
-    """whether to initialize the positions uniformly randomly (not SFM points)"""
     num_random: int = 10000
-    """Number of gaussians to initialize if random init is used"""
-    random_scale: float = 0.3
-    "Size of the cube to initialize random gaussians within"
-    ssim_lambda: float = 0.2
-    """weight of ssim loss"""
+    random_scale: float = .3
     stop_split_at: int = 25000
-    """stop splitting at this step"""
-    sh_degree: int = 3
-    """maximum degree of spherical harmonics to use"""
     use_scale_regularization: bool = True
-    """If enabled, a scale regularization introduced in PhysGauss (https://xpandora.github.io/PhysGaussian/) is used for reducing huge spikey gaussians."""
-    max_gauss_ratio: float = 10.0
-    """threshold of ratio of gaussian max to min scale before applying regularization
-    loss from the PhysGaussian paper
-    """
-    output_depth_during_training: bool = False
-    """If True, output depth during training. Otherwise, only output depth during evaluation."""
     rasterize_mode: Literal["classic", "antialiased"] = "antialiased"
-    """
-    Classic mode of rendering will use the EWA volume splatting with a [0.3, 0.3] screen space blurring kernel. This
-    approach is however not suitable to render tiny gaussians at higher or lower resolution than the captured, which
-    results "aliasing-like" artifacts. The antialiased mode overcomes this limitation by calculating compensation factors
-    and apply them to the opacities of gaussians to preserve the total integrated density of splats.
-    However, PLY exported with antialiased rasterize mode is not compatible with classic mode. Thus many web viewers that
-    were implemented for classic mode can not render antialiased mode PLY properly without modifications.
-    """
-    camera_optimizer: CameraOptimizerConfig = field(
-        default_factory=lambda: CameraOptimizerConfig(mode="SO3xR3")
-    )
-    """Config of the camera optimizer to use"""
-    use_bilateral_grid: bool = False
-    """If True, use bilateral grid to handle the ISP changes in the image space. This technique was introduced in the paper 'Bilateral Guided Radiance Field Processing' (https://bilarfpro.github.io/)."""
-    grid_shape: Tuple[int, int, int] = (16, 16, 8)
-    """Shape of the bilateral grid (X, Y, W)"""
-    color_corrected_metrics: bool = False
-    """If True, apply color correction to the rendered images before computing the metrics."""
+    camera_optimizer: CameraOptimizerConfig = field(default_factory=lambda: CameraOptimizerConfig(mode="SO3xR3"))
     strategy: Literal["default", "mcmc"] = "mcmc"
-    """The default strategy will be used if strategy is not specified. Other strategies, e.g. mcmc, can be used."""
     max_gs_num: int = 100_000
-    """Maximum number of GSs. Default to 1_000_000."""
-    noise_lr: float = 5e5
-    """MCMC samping noise learning rate. Default to 5e5."""
-    mcmc_opacity_reg: float = 0.01
-    """Regularization term for opacity in MCMC strategy. Only enabled when using MCMC strategy"""
-    mcmc_scale_reg: float = 0.01
-    """Regularization term for scale in MCMC strategy. Only enabled when using MCMC strategy"""
 
 
 class IHGSModel(SplatfactoModel):
     config: IHGSModelConfig
-
     def get_loss_dict(
         self, outputs, batch, metrics_dict=None
     ) -> Dict[str, torch.Tensor]:
@@ -156,6 +90,7 @@ class IHGSModel(SplatfactoModel):
         mask = mask.to(self.device)
         assert mask.shape[:2] == gt_img.shape[:2] == pred_img.shape[:2]
         mask = mask.float()
+        mask = mask.float()
         gt_img = gt_img * mask
         pred_img = pred_img * mask
 
@@ -175,8 +110,9 @@ class IHGSModel(SplatfactoModel):
             scale_reg = 0.1 * scale_reg.mean()
         else:
             scale_reg = torch.tensor(0.0).to(self.device)
-
+        # alpha_loss = torch.mean(outputs["accumulation"] * (1 - mask.float().detach())) * 0.01
         alpha_loss = torch.nn.L1Loss()(outputs["accumulation"], mask)
+        # alpha_loss = torch.mean(outputs["accumulation"] * (1 - mask.detach())) * 0.01
         loss_dict = {
             "main_loss": (1 - self.config.ssim_lambda) * Ll1
             + self.config.ssim_lambda * simloss,

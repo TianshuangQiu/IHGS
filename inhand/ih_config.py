@@ -44,9 +44,10 @@ ihgs_method = MethodSpecification(
         steps_per_eval_all_images=1000,
         max_num_iterations=30000,
         mixed_precision=False,
-        pipeline=VanillaPipelineConfig(
+        pipeline=IHGSPipelineConfig(
             datamanager=FullImageDatamanagerConfig(
-                dataparser=NerfstudioDataParserConfig(load_3D_points=True),
+                dataparser=NerfstudioDataParserConfig(
+                    load_3D_points=True, orientation_method="none", center_method="none", auto_scale_poses=False),
                 cache_images_type="uint8",
             ),
             model=IHGSModelConfig(),
