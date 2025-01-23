@@ -44,7 +44,7 @@ import torchvision
 from pytorch_msssim import SSIM
 from torch.nn import Parameter
 
-#add model configs
+# add model configs
 # @dataclass
 # class SplatfactoModelConfig(ModelConfig):
 
@@ -57,17 +57,21 @@ class IHGSModelConfig(SplatfactoModelConfig):
     densify_size_thresh: float = 0.001
     random_init: bool = True
     num_random: int = 10000
-    random_scale: float = .3
+    random_scale: float = 0.3
     stop_split_at: int = 25000
     use_scale_regularization: bool = True
     rasterize_mode: Literal["classic", "antialiased"] = "antialiased"
-    camera_optimizer: CameraOptimizerConfig = field(default_factory=lambda: CameraOptimizerConfig(mode="SO3xR3"))
+    camera_optimizer: CameraOptimizerConfig = field(
+        default_factory=lambda: CameraOptimizerConfig(mode="SO3xR3")
+    )
+    use_bilateral_grid: bool = True
     strategy: Literal["default", "mcmc"] = "mcmc"
     max_gs_num: int = 100_000
 
 
 class IHGSModel(SplatfactoModel):
     config: IHGSModelConfig
+
     def get_loss_dict(
         self, outputs, batch, metrics_dict=None
     ) -> Dict[str, torch.Tensor]:
@@ -88,8 +92,13 @@ class IHGSModel(SplatfactoModel):
         # batch["mask"] : [H, W, 1]
         mask = self._downscale_if_required(batch["mask"])
         mask = mask.to(self.device)
-        assert mask.shape[:2] == gt_img.shape[:2] == pred_img.shape[:2]
-        mask = mask.float()
+        gripper_mask = self._downscale_if_required(batch["gripper_mask"])
+        assert (
+            mask.shape[:2]
+            == gt_img.shape[:2]
+            == pred_img.shape[:2]
+            == gripper_mask.shape[:2]
+        )
         mask = mask.float()
         gt_img = gt_img * mask
         pred_img = pred_img * mask
@@ -110,9 +119,12 @@ class IHGSModel(SplatfactoModel):
             scale_reg = 0.1 * scale_reg.mean()
         else:
             scale_reg = torch.tensor(0.0).to(self.device)
-        # alpha_loss = torch.mean(outputs["accumulation"] * (1 - mask.float().detach())) * 0.01
-        alpha_loss = torch.nn.L1Loss()(outputs["accumulation"], mask)
-        # alpha_loss = torch.mean(outputs["accumulation"] * (1 - mask.detach())) * 0.01
+        # alpha_loss = torch.nn.L1Loss()(
+        #     outputs["accumulation"], torch.max(mask, gripper_mask)
+        # )
+        alpha_loss = torch.nn.L1Loss()(
+            outputs["accumulation"] * (1 - gripper_mask), mask * (1 - gripper_mask)
+        )
         loss_dict = {
             "main_loss": (1 - self.config.ssim_lambda) * Ll1
             + self.config.ssim_lambda * simloss,

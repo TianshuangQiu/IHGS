@@ -23,12 +23,37 @@ CONSOLE = Console(width=120)
 
 import os
 from inhand.ihgs import IHGSModelConfig, IHGSModel
+from glob import glob
+import numpy as np
+import cv2
 
 
 @dataclass
 class IHDataManagerConfig(FullImageDatamanagerConfig):
-    pass
+    _target: Type = field(default_factory=lambda: IHDataManager)
 
 
 class IHDataManager(FullImageDatamanager):
-    pass
+    config: IHDataManagerConfig
+
+    def __init__(
+        self,
+        config: IHDataManagerConfig,
+        device: Union[torch.device, str] = "cpu",
+        test_mode: Literal["test", "val", "inference"] = "val",
+        world_size: int = 1,
+        local_rank: int = 0,
+        **kwargs,
+    ):
+        super().__init__(config, device, test_mode, world_size, local_rank, **kwargs)
+        self.gripper_path = self.config.dataparser.data / "gripper_masks"
+
+    def load_gripper_data(self):
+        mask_paths = glob(str(self.gripper_path / "*.jpg"))
+        mask_paths.sort()
+        self.gripper_masks = np.array(
+            [cv2.imread(path, cv2.IMREAD_GRAYSCALE) / 255 for path in mask_paths],
+        )
+        self.gripper_masks = torch.tensor(
+            self.gripper_masks, device=self.device
+        ).unsqueeze(-1)
