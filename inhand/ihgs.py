@@ -119,9 +119,6 @@ class IHGSModel(SplatfactoModel):
             scale_reg = 0.1 * scale_reg.mean()
         else:
             scale_reg = torch.tensor(0.0).to(self.device)
-        # alpha_loss = torch.nn.L1Loss()(
-        #     outputs["accumulation"], torch.max(mask, gripper_mask)
-        # )
         alpha_loss = torch.nn.L1Loss()(
             outputs["accumulation"] * (1 - gripper_mask), mask * (1 - gripper_mask)
         )

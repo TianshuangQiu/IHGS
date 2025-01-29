@@ -42,7 +42,7 @@ ihgs_method = MethodSpecification(
         steps_per_eval_batch=0,
         steps_per_save=2000,
         steps_per_eval_all_images=1000,
-        max_num_iterations=60000,
+        max_num_iterations=30000,
         mixed_precision=False,
         pipeline=IHGSPipelineConfig(
             datamanager=IHDataManagerConfig(
@@ -58,10 +58,10 @@ ihgs_method = MethodSpecification(
         ),
         optimizers={
             "means": {
-                "optimizer": AdamOptimizerConfig(lr=1e-4, eps=1e-15),
+                "optimizer": AdamOptimizerConfig(lr=2e-4, eps=1e-15),
                 "scheduler": ExponentialDecaySchedulerConfig(
-                    lr_final=8e-7,
-                    max_steps=60000,
+                    lr_final=2e-6,
+                    max_steps=30000,
                 ),
             },
             "features_dc": {
@@ -80,7 +80,7 @@ ihgs_method = MethodSpecification(
                 "optimizer": AdamOptimizerConfig(lr=0.004, eps=1e-15),
                 "scheduler": ExponentialDecaySchedulerConfig(
                     lr_final=0.001,
-                    max_steps=60000,
+                    max_steps=30000,
                 ),
             },
             "quats": {
@@ -90,13 +90,13 @@ ihgs_method = MethodSpecification(
             "camera_opt": {
                 "optimizer": AdamOptimizerConfig(lr=5e-5, eps=1e-15),
                 "scheduler": ExponentialDecaySchedulerConfig(
-                    lr_final=1e-6, max_steps=60000, warmup_steps=3000, lr_pre_warmup=0
+                    lr_final=1e-6, max_steps=30000, warmup_steps=3000, lr_pre_warmup=0
                 ),
             },
             "bilateral_grid": {
                 "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
                 "scheduler": ExponentialDecaySchedulerConfig(
-                    lr_final=1e-4, max_steps=60000, warmup_steps=1000, lr_pre_warmup=0
+                    lr_final=1e-4, max_steps=30000, warmup_steps=1000, lr_pre_warmup=0
                 ),
             },
         },
