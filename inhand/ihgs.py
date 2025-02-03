@@ -56,7 +56,7 @@ class IHGSModelConfig(SplatfactoModelConfig):
     densify_grad_thresh: float = 0.0006
     densify_size_thresh: float = 0.001
     random_init: bool = True
-    num_random: int = 10000
+    num_random: int = 30000
     random_scale: float = 0.3
     stop_split_at: int = 25000
     use_scale_regularization: bool = True
@@ -67,6 +67,7 @@ class IHGSModelConfig(SplatfactoModelConfig):
     use_bilateral_grid: bool = True
     strategy: Literal["default", "mcmc"] = "mcmc"
     max_gs_num: int = 100_000
+    resolution_schedule: int = 10000
 
 
 class IHGSModel(SplatfactoModel):
@@ -92,7 +93,9 @@ class IHGSModel(SplatfactoModel):
         # batch["mask"] : [H, W, 1]
         mask = self._downscale_if_required(batch["mask"])
         mask = mask.to(self.device)
-        gripper_mask = self._downscale_if_required(batch["gripper_mask"])
+        gripper_mask = self._downscale_if_required(
+            batch["gripper_mask"].to(self.device)
+        )
         assert (
             mask.shape[:2]
             == gt_img.shape[:2]

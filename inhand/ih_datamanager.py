@@ -54,6 +54,6 @@ class IHDataManager(FullImageDatamanager):
         self.gripper_masks = np.array(
             [cv2.imread(path, cv2.IMREAD_GRAYSCALE) / 255 for path in mask_paths],
         )
-        self.gripper_masks = torch.tensor(
-            self.gripper_masks, device=self.device
-        ).unsqueeze(-1)
+        self.gripper_masks = torch.tensor(self.gripper_masks, device="cpu").unsqueeze(
+            -1
+        )
