@@ -57,3 +57,7 @@ class IHDataManager(FullImageDatamanager):
         self.gripper_masks = torch.tensor(self.gripper_masks, device="cpu").unsqueeze(
             -1
         )
+
+    def load_camera_data(self):
+        camera_opt_path = str(self.config.dataparser.data / "merged_camera_opt.pth")
+        return torch.load(camera_opt_path, map_location="cpu")

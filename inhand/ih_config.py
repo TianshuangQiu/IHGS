@@ -51,6 +51,7 @@ ihgs_method = MethodSpecification(
                     orientation_method="none",
                     center_method="none",
                     auto_scale_poses=False,
+                    train_split_fraction=1,
                 ),
                 cache_images_type="uint8",
             ),

@@ -43,6 +43,7 @@ import cv2
 import torchvision
 from pytorch_msssim import SSIM
 from torch.nn import Parameter
+from nerfstudio.cameras.lie_groups import exp_map_SE3, exp_map_SO3xR3
 
 # add model configs
 # @dataclass
@@ -74,7 +75,7 @@ class IHGSModel(SplatfactoModel):
     config: IHGSModelConfig
 
     def get_loss_dict(
-        self, outputs, batch, metrics_dict=None
+        self, outputs, batch, metrics_dict=None, merged=False
     ) -> Dict[str, torch.Tensor]:
         """Computes and returns the losses dict.
 
