@@ -108,10 +108,10 @@ class KinematicCameraOptimizer(CameraOptimizer):
             non_trainable_camera_indices=non_trainable_camera_indices,
             **kwargs,
         )
-        self.global_adjustment = torch.nn.Parameter(torch.zeros((1, 6), device=device))
+        self.global_adjustment = torch.nn.Parameter(torch.zeros((2, 6), device=device))
 
     def load_frame_info(self, hand_data):
-        self.hand_data = hand_data.float()
+        self.hand_data = hand_data.int()
 
     def forward(
         self,
@@ -173,11 +173,11 @@ class KinematicCameraOptimizer(CameraOptimizer):
 
         camera_idx = camera.metadata["cam_idx"]
         adj = self(torch.tensor([camera_idx], dtype=torch.long)).to(camera.device)  # type: ignore # 3x4
-        # TODO
-        # global_adj = TODO # 3x4 #either identity or global adjustment
+
         global_adj = exp_map_SO3xR3(
-            self.global_adjustment[0].unsqueeze(0)
-            * self.hand_data[camera.metadata["cam_idx"]]
+            self.global_adjustment[
+                self.hand_data[camera.metadata["cam_idx"]]
+            ].unsqueeze(0)
         )
         full_adj = torch.cat(
             [
@@ -191,11 +191,10 @@ class KinematicCameraOptimizer(CameraOptimizer):
                 # Apply rotation to directions in world coordinates, without touching the origin.
                 # Equivalent to: directions -> correction[:3,:3] @ directions
                 # convert both to 4x4
-                # full_adj = global_adj @ adj
                 torch.bmm(full_adj[..., :3, :3], camera.camera_to_worlds[..., :3, :3]),
                 # Apply translation in world coordinate, independently of rotation.
                 # Equivalent to: origins -> origins + correction[:3,3]
-                camera.camera_to_worlds[..., :3, 3:] + adj[..., :3, 3:],
+                camera.camera_to_worlds[..., :3, 3:] + full_adj[..., :3, 3:],
             ],
             dim=-1,
         )
@@ -207,6 +206,10 @@ class KinematicCameraOptimizer(CameraOptimizer):
                 self.pose_adjustment[:, :3].norm(dim=-1).mean()
                 * self.config.trans_l2_penalty
                 + self.pose_adjustment[:, 3:].norm(dim=-1).mean()
+                * self.config.rot_l2_penalty
+                + self.global_adjustment[:, :3].norm(dim=-1).mean()
+                * self.config.trans_l2_penalty
+                + self.global_adjustment[:, 3:].norm(dim=-1).mean()
                 * self.config.rot_l2_penalty
             )
 
@@ -227,8 +230,8 @@ class KinematicCameraOptimizer(CameraOptimizer):
     def get_param_groups(self, param_groups: dict) -> None:
         """Get camera optimizer parameters"""
         camera_opt_params = list(self.parameters())
-        if self.config.mode != "off":
-            assert len(camera_opt_params) > 0
-            param_groups["camera_opt"] = camera_opt_params
-        else:
-            assert len(camera_opt_params) == 0
+        for param in camera_opt_params:
+            if param.shape == (2, 6):
+                param_groups["global_opt"] = [param]
+            else:
+                param_groups["camera_opt"] = [param]

@@ -94,6 +94,12 @@ ihgs_method = MethodSpecification(
                     lr_final=1e-6, max_steps=30000, warmup_steps=3000, lr_pre_warmup=0
                 ),
             },
+            "global_opt": {
+                "optimizer": AdamOptimizerConfig(lr=1e-5, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(
+                    lr_final=1e-6, max_steps=30000, warmup_steps=3000, lr_pre_warmup=0
+                ),
+            },
             "bilateral_grid": {
                 "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
                 "scheduler": ExponentialDecaySchedulerConfig(
