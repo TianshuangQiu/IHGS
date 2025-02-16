@@ -24,6 +24,10 @@ from nerfstudio.model_components.lib_bilagrid import (
 )
 from nerfstudio.models.instant_ngp import InstantNGPModelConfig, NGPModel
 from nerfstudio.cameras.camera_optimizers import CameraOptimizer, CameraOptimizerConfig
+from inhand.kin_camera_opt import (
+    KinematicCameraOptimizerConfig,
+    KinematicCameraOptimizer,
+)
 
 import math
 from dataclasses import dataclass, field
@@ -62,8 +66,8 @@ class IHGSModelConfig(SplatfactoModelConfig):
     stop_split_at: int = 25000
     use_scale_regularization: bool = True
     rasterize_mode: Literal["classic", "antialiased"] = "antialiased"
-    camera_optimizer: CameraOptimizerConfig = field(
-        default_factory=lambda: CameraOptimizerConfig(mode="SO3xR3")
+    camera_optimizer: KinematicCameraOptimizerConfig = field(
+        default_factory=lambda: KinematicCameraOptimizerConfig(mode="SO3xR3")
     )
     use_bilateral_grid: bool = True
     strategy: Literal["default", "mcmc"] = "mcmc"
@@ -74,8 +78,15 @@ class IHGSModelConfig(SplatfactoModelConfig):
 class IHGSModel(SplatfactoModel):
     config: IHGSModelConfig
 
+    def load_frame_info(self, hand_data):
+        self.hand_data = hand_data
+        self.camera_optimizer.load_frame_info(hand_data)
+
     def get_loss_dict(
-        self, outputs, batch, metrics_dict=None, merged=False
+        self,
+        outputs,
+        batch,
+        metrics_dict=None,
     ) -> Dict[str, torch.Tensor]:
         """Computes and returns the losses dict.
 

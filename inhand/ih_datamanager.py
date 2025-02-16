@@ -18,6 +18,7 @@ from nerfstudio.data.datamanagers.full_images_datamanager import (
 )
 from rich.progress import Console
 from nerfstudio.models.splatfacto import SplatfactoModelConfig, SplatfactoModel
+import json
 
 CONSOLE = Console(width=120)
 
@@ -58,6 +59,14 @@ class IHDataManager(FullImageDatamanager):
             -1
         )
 
-    def load_camera_data(self):
-        camera_opt_path = str(self.config.dataparser.data / "merged_camera_opt.pth")
-        return torch.load(camera_opt_path, map_location="cpu")
+    def load_hand_data(self):
+        transform_path = self.config.dataparser.data / "transforms.json"
+        transforms = json.load(open(transform_path))
+        right_masks = []
+        for frame in transforms["frames"]:
+            if "right" in frame["file_path"]:
+                right_masks.append(True)
+            else:
+                right_masks.append(False)
+        self.right_masks = torch.tensor(right_masks, device="cpu")
+        return self.right_masks
