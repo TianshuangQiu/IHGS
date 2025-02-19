@@ -108,7 +108,7 @@ class KinematicCameraOptimizer(CameraOptimizer):
             non_trainable_camera_indices=non_trainable_camera_indices,
             **kwargs,
         )
-        self.global_adjustment = torch.nn.Parameter(torch.zeros((2, 6), device=device))
+        self.global_adjustment = torch.nn.Parameter(torch.zeros((1, 6), device=device))
 
     def load_frame_info(self, hand_data):
         self.hand_data = hand_data.int()
@@ -162,7 +162,9 @@ class KinematicCameraOptimizer(CameraOptimizer):
                 correction_matrices[:, :3, :3], raybundle.directions[..., None]
             ).squeeze()
 
-    def apply_to_camera(self, camera: Cameras) -> torch.Tensor:
+    def apply_to_camera(
+        self, camera: Cameras, step: int, combined: int = 0, loaded_opt: bool = True
+    ) -> torch.Tensor:
         """Apply the pose correction to the world-to-camera matrix in a Camera object"""
         if self.config.mode == "off":
             return camera.camera_to_worlds
@@ -173,19 +175,27 @@ class KinematicCameraOptimizer(CameraOptimizer):
 
         camera_idx = camera.metadata["cam_idx"]
         adj = self(torch.tensor([camera_idx], dtype=torch.long)).to(camera.device)  # type: ignore # 3x4
-
         global_adj = exp_map_SO3xR3(
-            self.global_adjustment[
-                self.hand_data[camera.metadata["cam_idx"]]
-            ].unsqueeze(0)
+            self.hand_data[camera.metadata["cam_idx"]] * self.global_adjustment
         )
-        full_adj = torch.cat(
-            [
-                torch.bmm(global_adj[..., :3, :3], adj[..., :3, :3]),
-                global_adj[..., :3, 3:] + adj[..., :3, 3:],
-            ],
-            dim=-1,
-        )
+
+        if combined == 1:
+            full_adj = global_adj
+        elif combined == 2:
+            if (step // 1000) % 2 == 0:
+                adj = adj.detach()
+            else:
+                global_adj = global_adj.detach()
+            full_adj = torch.cat(
+                [
+                    torch.bmm(adj[..., :3, :3], global_adj[..., :3, :3]),
+                    adj[..., :3, 3:] + global_adj[..., :3, 3:],
+                ],
+                dim=-1,
+            )
+        else:
+            full_adj = adj
+
         return torch.cat(
             [
                 # Apply rotation to directions in world coordinates, without touching the origin.
@@ -207,10 +217,6 @@ class KinematicCameraOptimizer(CameraOptimizer):
                 * self.config.trans_l2_penalty
                 + self.pose_adjustment[:, 3:].norm(dim=-1).mean()
                 * self.config.rot_l2_penalty
-                + self.global_adjustment[:, :3].norm(dim=-1).mean()
-                * self.config.trans_l2_penalty
-                + self.global_adjustment[:, 3:].norm(dim=-1).mean()
-                * self.config.rot_l2_penalty
             )
 
     def get_correction_matrices(self):
@@ -230,8 +236,11 @@ class KinematicCameraOptimizer(CameraOptimizer):
     def get_param_groups(self, param_groups: dict) -> None:
         """Get camera optimizer parameters"""
         camera_opt_params = list(self.parameters())
-        for param in camera_opt_params:
-            if param.shape == (2, 6):
-                param_groups["global_opt"] = [param]
-            else:
-                param_groups["camera_opt"] = [param]
+        if self.config.mode == "off":
+            param_groups["camera_opt"] = []
+        else:
+            for param in camera_opt_params:
+                if param.shape == (1, 6):
+                    param_groups["global_opt"] = [param]
+                else:
+                    param_groups["camera_opt"] = [param]

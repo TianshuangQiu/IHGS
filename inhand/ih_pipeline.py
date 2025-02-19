@@ -31,6 +31,8 @@ class IHGSPipelineConfig(VanillaPipelineConfig):
         default_factory=lambda: IHDataManagerConfig()
     )
     model: IHGSModelConfig = field(default_factory=lambda: IHGSModelConfig())
+    combined: int = 1
+    loaded_opt: bool = True
 
 
 class IHGSPipeline(VanillaPipeline):
@@ -50,6 +52,10 @@ class IHGSPipeline(VanillaPipeline):
         super().__init__(config, device, test_mode, world_size, local_rank, grad_scaler)
         self.datamanager.load_gripper_data()
         self.model.load_frame_info(self.datamanager.load_hand_data())
+        self.combined = config.combined
+        self.loaded_opt = config.loaded_opt
+        self.model.combined = self.combined
+        self.model.loaded_opt = self.loaded_opt
 
     @profiler.time_function
     def get_train_loss_dict(self, step: int):
@@ -67,6 +73,12 @@ class IHGSPipeline(VanillaPipeline):
         metrics_dict = self.model.get_metrics_dict(model_outputs, batch)
         batch["gripper_mask"] = self.datamanager.gripper_masks[batch["image_idx"]]
         loss_dict = self.model.get_loss_dict(model_outputs, batch, metrics_dict)
+        if step == 29999 or step % 10000 == 0:
+            self.save_gaussians(step)
+            self.save_camera_opt(step)
+        if self.combined == 1 and step % 1000 == 0:
+            output_path = self.config.datamanager.dataparser.data / "global.pt"
+            torch.save(self.model.camera_optimizer.global_adjustment, output_path)
         return model_outputs, loss_dict, metrics_dict
 
     def save_gaussians(self, step: int):

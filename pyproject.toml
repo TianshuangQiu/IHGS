@@ -11,4 +11,5 @@ include = ["inhand*"]
 
 [project.entry-points.'nerfstudio.method_configs']
 ihgs = 'inhand.ih_config:ihgs_method'
-ihrf = 'inhand.ih_config:ihrf_method'
+ihgs_fast_merged = 'inhand.ih_config:ihgs_fast_merged'
+ihgs_full_merged = 'inhand.ih_config:ihgs_full_merged'
