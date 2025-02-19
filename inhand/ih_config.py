@@ -42,7 +42,7 @@ ihgs_method = MethodSpecification(
         steps_per_eval_batch=0,
         steps_per_save=2000,
         steps_per_eval_all_images=1000,
-        max_num_iterations=30000,
+        max_num_iterations=10000,
         mixed_precision=False,
         pipeline=IHGSPipelineConfig(
             datamanager=IHDataManagerConfig(
@@ -55,7 +55,7 @@ ihgs_method = MethodSpecification(
                 ),
                 cache_images_type="uint8",
             ),
-            model=IHGSModelConfig(resolution_schedule=15000),
+            model=IHGSModelConfig(resolution_schedule=5000, num_downscales=3),
             combined=0,
             loaded_opt=False,
         ),
@@ -135,7 +135,9 @@ ihgs_fast_merged = MethodSpecification(
                 ),
                 cache_images_type="uint8",
             ),
-            model=IHGSModelConfig(stop_split_at=25000, num_downscales=4),
+            model=IHGSModelConfig(
+                stop_split_at=25000, num_downscales=4, resolution_schedule=7500
+            ),
             combined=1,
         ),
         optimizers={
@@ -215,7 +217,7 @@ ihgs_full_merged = MethodSpecification(
                 ),
                 cache_images_type="uint8",
             ),
-            model=IHGSModelConfig(resolution_schedule=10000, num_downscales=4),
+            model=IHGSModelConfig(resolution_schedule=5000, num_downscales=4),
             combined=2,
             loaded_opt=True,
         ),
