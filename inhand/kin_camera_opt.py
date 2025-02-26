@@ -237,7 +237,7 @@ class KinematicCameraOptimizer(CameraOptimizer):
         """Get camera optimizer parameters"""
         camera_opt_params = list(self.parameters())
         if self.config.mode == "off":
-            param_groups["camera_opt"] = []
+            return
         else:
             for param in camera_opt_params:
                 if param.shape == (1, 6):

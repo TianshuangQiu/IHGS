@@ -73,25 +73,25 @@ class IHGSPipeline(VanillaPipeline):
         metrics_dict = self.model.get_metrics_dict(model_outputs, batch)
         batch["gripper_mask"] = self.datamanager.gripper_masks[batch["image_idx"]]
         loss_dict = self.model.get_loss_dict(model_outputs, batch, metrics_dict)
-        if step == 29999 or step % 10000 == 0:
-            self.save_gaussians(step)
-            self.save_camera_opt(step)
-        if self.combined == 1 and step % 1000 == 0:
+        if self.combined == 0 and step % 5000 == 999:
+            self.save_gaussians()
+            self.save_camera_opt()
+            torch.save(
+                self.model.pipeline_save,
+                self.config.datamanager.dataparser.data / "pipe_save.pt",
+            )
+        if self.combined == 1 and step % 5000 == 4999:
             output_path = self.config.datamanager.dataparser.data / "global.pt"
             torch.save(self.model.camera_optimizer.global_adjustment, output_path)
         return model_outputs, loss_dict, metrics_dict
 
-    def save_gaussians(self, step: int):
+    def save_gaussians(self):
         model = self.model
         data_path = self.config.datamanager.dataparser.data
         # Extract Gaussian parameters
         positions = (
             model.gauss_params["means"].detach().cpu().numpy()
         )  # Gaussian centers
-        scales = model.gauss_params["scales"].detach().cpu().numpy()  # Gaussian scales
-        opacities = (
-            model.gauss_params["opacities"].detach().cpu().numpy()
-        )  # Gaussian opacities
         colors = SH2RGB(model.gauss_params["features_dc"]).detach().cpu().numpy()
         # SH2RGB(self.features_dc)
 
@@ -101,14 +101,14 @@ class IHGSPipeline(VanillaPipeline):
         pcd.colors = o3d.utility.Vector3dVector(colors)  # Set colors
 
         # Save the point cloud as a .ply file
-        output_path = f"{data_path}/gaussians_step_{step}.ply"
+        output_path = f"{data_path}/gaussians.ply"
         o3d.io.write_point_cloud(output_path, pcd)
-        print(f"Saved point cloud to {output_path}")
 
-    def save_camera_opt(self, step: int):
+    def save_camera_opt(self):
         model = self.model
         data_path = self.config.datamanager.dataparser.data
         gps = model.get_param_groups()
-        camera_opt = gps["camera_opt"][0].detach().cpu()
-        output_path = f"{data_path}/camera_adjustment.pt"
-        torch.save(camera_opt, output_path)
+        if "camera_opt" in gps:
+            camera_opt = gps["camera_opt"][0].detach().cpu()
+            output_path = f"{data_path}/camera_adjustment.pt"
+            torch.save(camera_opt, output_path)

@@ -74,16 +74,40 @@ class IHGSModelConfig(SplatfactoModelConfig):
     max_gs_num: int = 250_000
     resolution_schedule: int = 10000
     warmup_length: int = 1500
+    gaussian_dim: int = 64
+    dim: int = 96
 
 
 class IHGSModel(SplatfactoModel):
     config: IHGSModelConfig
     combined: int
     loaded_opt: bool
+    pipeline_save = {}
 
     def load_frame_info(self, hand_data):
         self.hand_data = hand_data
         self.camera_optimizer.load_frame_info(hand_data)
+
+    # def populate_modules(self):
+    #     super().populate_modules()
+    #     self.gauss_params["dino_feats"] = torch.nn.Parameter(
+    #         torch.randn((self.num_points, self.config.gaussian_dim))
+    #     )
+    #     torch.inverse(
+    #         torch.ones((1, 1), device="cuda:0")
+    #     )  # https://github.com/pytorch/pytorch/issues/90613
+    #     self.click_location = None
+    #     self.click_handle = None
+    #     # convert to torch
+    #     self.nn = torch.nn.Sequential(
+    #         torch.nn.Linear(self.config.gaussian_dim, 64, bias=False),
+    #         torch.nn.ReLU(),
+    #         torch.nn.Linear(64, 64, bias=False),
+    #         torch.nn.ReLU(),
+    #         torch.nn.Linear(64, 64, bias=False),
+    #         torch.nn.ReLU(),
+    #         torch.nn.Linear(64, self.config.dim, bias=False),
+    #     )
 
     def get_outputs(self, camera: Cameras) -> Dict[str, Union[torch.Tensor, List]]:
         """Takes in a camera and returns a dictionary of outputs.
@@ -218,6 +242,34 @@ class IHGSModel(SplatfactoModel):
         if background.shape[0] == 3 and not self.training:
             background = background.expand(H, W, 3)
 
+        # opacities_crop = self.opacities
+        # means_crop = self.means
+        # features_dc_crop = self.features_dc
+        # features_rest_crop = self.features_rest
+        # scales_crop = self.scales
+        # quats_crop = self.quats
+        # dino_crop = self.gauss_params["dino_feats"]
+
+        # dino_feats, dino_alpha, _ = rasterization(
+        #     means=means_crop.detach() if self.training else means_crop,
+        #     quats=F.normalize(quats_crop, dim=1).detach(),
+        #     scales=torch.exp(scales_crop).detach(),
+        #     opacities=torch.sigmoid(opacities_crop).squeeze(-1).detach(),
+        #     colors=dino_crop,
+        #     viewmats=viewmat,  # [1, 4, 4]
+        #     Ks=dino_K,  # [1, 3, 3]
+        #     width=dino_w,
+        #     height=dino_h,
+        #     packed=False,
+        #     near_plane=0.01,
+        #     far_plane=1e10,
+        #     render_mode="RGB",
+        #     sparse_grad=False,
+        #     absgrad=False,
+        #     rasterize_mode=self.config.rasterize_mode,
+        #     tile_size=10,
+        # )
+
         return {
             "rgb": rgb.squeeze(0),  # type: ignore
             "depth": depth_im,  # type: ignore
@@ -283,6 +335,9 @@ class IHGSModel(SplatfactoModel):
             )
         else:
             alpha_loss = torch.nn.L1Loss()(outputs["accumulation"], mask)
+            self.pipeline_save[batch["image_idx"]] = (
+                outputs["accumulation"].detach().cpu()
+            )
         loss_dict = {
             "main_loss": (1 - self.config.ssim_lambda) * Ll1
             + self.config.ssim_lambda * simloss,
