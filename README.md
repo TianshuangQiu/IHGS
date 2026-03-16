@@ -40,14 +40,20 @@ Each dataset should be organised as:
 ```
 <data_path>/
   left/
-    images/
-    masks/
+    images/          # raw RGB frames
+    masks/           # object segmentation masks (single-channel grayscale JPG)
+    gripper_masks/   # robot gripper masks (single-channel grayscale JPG)
+    transforms.json
   right/
     images/
     masks/
+    gripper_masks/
+    transforms.json
 ```
 
-Images are the raw RGB frames; masks are single-channel grayscale JPGs indicating the object region (see `scripts/convert_masks.py` to convert PNG masks).
+**Object masks** (`masks/`) indicate the object region and are used to focus training on the object. See `scripts/convert_masks.py` to convert PNG masks (e.g. from SAM) to the expected grayscale JPG format.
+
+**Gripper masks** (`gripper_masks/`) indicate pixels occupied by the robot gripper. During combined (merged) training these regions are excluded from both the photometric loss and the alpha loss, so the model learns to reconstruct the object rather than the gripper. Both mask types follow the naming convention `frame_XXXX.jpg`.
 
 Before training, generate `transforms.json` for each view using the robot pose data from your capture system.
 
