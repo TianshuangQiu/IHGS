@@ -140,7 +140,7 @@ ihgs_cross_merged = MethodSpecification(
             model=IHGSModelConfig(
                 resolution_schedule=10000, num_downscales=3, sh_degree=1
             ),
-            combined=2,
+            combined=0,
             loaded_opt=True,
         ),
         optimizers={
@@ -199,7 +199,6 @@ ihgs_cross_merged = MethodSpecification(
     ),
     description="In-Hand Gaussian Splatting",
 )
-
 
 ihgs_full_merged = MethodSpecification(
     config=TrainerConfig(
@@ -274,6 +273,89 @@ ihgs_full_merged = MethodSpecification(
                 "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
                 "scheduler": ExponentialDecaySchedulerConfig(
                     lr_final=1e-4, max_steps=50000, warmup_steps=1000, lr_pre_warmup=0
+                ),
+            },
+        },
+        viewer=ViewerConfig(num_rays_per_chunk=1 << 15, quit_on_train_completion=True),
+        vis="viewer",
+        gradient_accumulation_steps={"global_opt": 50},
+    ),
+    description="In-Hand Gaussian Splatting",
+)
+
+ihgs_fast_merged = MethodSpecification(
+    config=TrainerConfig(
+        method_name="ihgs-fast-merged",
+        steps_per_eval_image=100,
+        steps_per_eval_batch=0,
+        steps_per_save=2000,
+        steps_per_eval_all_images=1000,
+        max_num_iterations=16000,
+        mixed_precision=False,
+        pipeline=IHGSPipelineConfig(
+            datamanager=IHDataManagerConfig(
+                dataparser=NerfstudioDataParserConfig(
+                    load_3D_points=True,
+                    orientation_method="none",
+                    center_method="none",
+                    auto_scale_poses=False,
+                    train_split_fraction=1,
+                ),
+                cache_images_type="uint8",
+            ),
+            model=IHGSModelConfig(
+                resolution_schedule=5000, num_downscales=3, sh_degree=1
+            ),
+            combined=3,
+            loaded_opt=True,
+        ),
+        optimizers={
+            "means": {
+                "optimizer": AdamOptimizerConfig(lr=2e-4, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(
+                    lr_final=2e-6,
+                    max_steps=16000,
+                ),
+            },
+            "features_dc": {
+                "optimizer": AdamOptimizerConfig(lr=0.0025, eps=1e-15),
+                "scheduler": None,
+            },
+            "features_rest": {
+                "optimizer": AdamOptimizerConfig(lr=0.0025 / 20, eps=1e-15),
+                "scheduler": None,
+            },
+            "opacities": {
+                "optimizer": AdamOptimizerConfig(lr=0.05, eps=1e-15),
+                "scheduler": None,
+            },
+            "scales": {
+                "optimizer": AdamOptimizerConfig(lr=0.004, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(
+                    lr_final=0.001,
+                    max_steps=16000,
+                ),
+            },
+            "quats": {
+                "optimizer": AdamOptimizerConfig(lr=0.001, eps=1e-15),
+                "scheduler": None,
+            },
+            "camera_opt": {
+                "optimizer": AdamOptimizerConfig(lr=5e-5, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(
+                    lr_final=1e-6, max_steps=16000, warmup_steps=3000, lr_pre_warmup=0
+                ),
+            },
+            "global_opt": {
+                "optimizer": AdamOptimizerConfig(lr=5e-4, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(
+                    lr_final=5e-7, max_steps=1000, warmup_steps=50, lr_pre_warmup=0
+                ),
+            },
+            "bilateral_grid": {
+                "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
+                "scheduler": ExponentialDecaySchedulerConfig(
+                    lr_final=1e-4, max_steps=16000, warmup_steps=1000, lr_pre_warmup=0
                 ),
             },
         },

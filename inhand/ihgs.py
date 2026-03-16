@@ -310,6 +310,8 @@ class IHGSModel(SplatfactoModel):
             == gripper_mask.shape[:2]
         )
         mask = mask.float()
+        if self.combined:
+            mask = torch.min(mask, 1 - gripper_mask)
         gt_img = gt_img * mask
         pred_img = pred_img * mask
 
@@ -329,7 +331,7 @@ class IHGSModel(SplatfactoModel):
             scale_reg = 0.1 * scale_reg.mean()
         else:
             scale_reg = torch.tensor(0.0).to(self.device)
-        if self.combined:
+        if self.combined > 1:
             alpha_loss = torch.nn.L1Loss()(
                 outputs["accumulation"] * (1 - gripper_mask), mask * (1 - gripper_mask)
             )

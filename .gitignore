@@ -169,6 +169,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-data/
-outputs/
-renders/
+data*/
+output*/
+renders*/
+defect_detection

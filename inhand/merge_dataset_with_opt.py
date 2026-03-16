@@ -10,6 +10,7 @@ from glob import glob
 import shutil
 from tqdm import tqdm
 import cv2
+from scipy.spatial.transform import Rotation as R
 
 
 def compute_icp(data_path):
@@ -25,14 +26,22 @@ def compute_icp(data_path):
         return lr_transform
     if not os.path.exists(os.path.join(data_path, "right", "gaussians.ply")):
         return lr_transform
+
     pcd1 = o3d.io.read_point_cloud(os.path.join(data_path, "left", "gaussians.ply"))
     pcd2 = o3d.io.read_point_cloud(os.path.join(data_path, "right", "gaussians.ply"))
+
+    pcd2.transform(lr_transform)
+    merged_pcd = pcd1 + pcd2
+    o3d.io.write_point_cloud(
+        f"{data_path}/combined/merged.ply", merged_pcd.uniform_down_sample(10)
+    )
+    return lr_transform
     pcd1.estimate_normals(
-        search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.02, max_nn=30)
+        search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.02, max_nn=50)
     )
 
     pcd2.estimate_normals(
-        search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.02, max_nn=30)
+        search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.02, max_nn=50)
     )
 
     reg_p2p = o3d.pipelines.registration.registration_colored_icp(
@@ -41,7 +50,7 @@ def compute_icp(data_path):
         max_correspondence_distance=0.01,
         init=lr_transform,
         criteria=o3d.pipelines.registration.ICPConvergenceCriteria(
-            relative_fitness=1e-6, relative_rmse=1e-6, max_iteration=50
+            relative_fitness=1e-6, relative_rmse=1e-6, max_iteration=50000
         ),
     )
 
@@ -49,12 +58,35 @@ def compute_icp(data_path):
     print("Transformation Matrix after ICP:\n", reg_p2p.transformation)
 
     pcd2.transform(reg_p2p.transformation)
-    merged_pcd = pcd1 + pcd2
-    o3d.io.write_point_cloud(
-        f"{data_path}/combined/merged.ply", merged_pcd.uniform_down_sample(10)
-    )
+    merged_pcd1 = pcd1 + pcd2
+    obb1 = merged_pcd1.get_oriented_bounding_box()
+    pcd2.transform(np.linalg.inv(reg_p2p.transformation))
 
-    return reg_p2p.transformation.copy()
+    reg_p2p_colorless = o3d.pipelines.registration.registration_icp(
+        pcd2,
+        pcd1,
+        max_correspondence_distance=0.001,
+        init=lr_transform,
+        criteria=o3d.pipelines.registration.ICPConvergenceCriteria(
+            relative_fitness=1e-8, relative_rmse=1e-8, max_iteration=50000
+        ),
+    )
+    pcd2.transform(reg_p2p_colorless.transformation)
+    merged_pcd2 = pcd1 + pcd2
+    obb2 = merged_pcd2.get_oriented_bounding_box()
+
+    if obb1.volume() < obb2.volume():
+        print("Using colored ICP")
+        o3d.io.write_point_cloud(
+            f"{data_path}/combined/merged.ply", merged_pcd1.uniform_down_sample(10)
+        )
+        return reg_p2p.transformation.copy()
+    else:
+        print("Using colorless ICP")
+        o3d.io.write_point_cloud(
+            f"{data_path}/combined/merged.ply", merged_pcd2.uniform_down_sample(10)
+        )
+        return reg_p2p_colorless.transformation.copy()
 
 
 def optimize_masks(data_path, side):
@@ -91,8 +123,8 @@ def optimize_masks(data_path, side):
         # if overlap is less than 80% of accumulation, remove
         if np.sum(np.maximum(mask, v.squeeze())) / np.sum(v) < 0.8:
             remove_idx.append(k)
-        output_mask = np.zeros_like(mask)
-        output_mask = np.maximum(mask, v.squeeze())
+        output_mask = mask.copy()
+        # output_mask = np.maximum(mask, v.squeeze())
         output_mask = np.minimum(output_mask, (1 - gripper_mask))
         output_mask = output_mask * 255
 
